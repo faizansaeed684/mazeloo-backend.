@@ -57,8 +57,11 @@ app.post('/api/auth/signup', async (req, res) => {
 
         res.status(201).json({ user, token });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error during signup' });
+        console.error('Signup Error:', err);
+        res.status(500).json({
+            error: 'Database error saving new user',
+            details: err.message
+        });
     }
 });
 
