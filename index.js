@@ -16,7 +16,27 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// ============ AUTH ROUTES ============
+// Log env config on startup so we can verify in Render logs
+const supabaseUrl = process.env.SUPABASE_URL || '(NOT SET)';
+console.log('=== CONFIG CHECK ===');
+console.log('SUPABASE_URL:', supabaseUrl.substring(0, 40));
+console.log('KEY SET:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+console.log('KEY length:', (process.env.SUPABASE_SERVICE_ROLE_KEY || '').length);
+console.log('====================');
+
+// Health check endpoint - also tests Supabase connection
+app.get('/health', async (req, res) => {
+    try {
+        const { error } = await supabase.from('users').select('id').limit(1);
+        if (error) {
+            return res.json({ status: 'error', supabaseError: error.message, url: supabaseUrl.substring(0, 40) });
+        }
+        res.json({ status: 'ok', supabase: 'connected', url: supabaseUrl.substring(0, 40) });
+    } catch (e) {
+        res.json({ status: 'error', message: e.message, url: supabaseUrl.substring(0, 40) });
+    }
+});
+
 
 app.post('/api/auth/signup', async (req, res) => {
     const { username, password, full_name, country, whatsapp, referral_code } = req.body;
