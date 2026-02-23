@@ -26,8 +26,18 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     try {
-        // Check username uniqueness
-        const { data: existing } = await supabase.from('users').select('id').eq('username', username).single();
+        // Check username uniqueness - use maybeSingle() to avoid error on no results
+        const { data: existing, error: checkError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('username', username)
+            .maybeSingle();
+
+        if (checkError) {
+            console.error('Username check error:', checkError);
+            return res.status(500).json({ error: `Database check failed: ${checkError.message}` });
+        }
+
         if (existing) {
             return res.status(409).json({ error: 'Username already taken' });
         }
@@ -39,7 +49,11 @@ app.post('/api/auth/signup', async (req, res) => {
         // Check for referrer
         let referred_by = null;
         if (referral_code) {
-            const { data: referrer } = await supabase.from('users').select('id').eq('referral_code', referral_code).single();
+            const { data: referrer } = await supabase
+                .from('users')
+                .select('id')
+                .eq('referral_code', referral_code)
+                .maybeSingle();
             if (referrer) {
                 referred_by = referrer.id;
             }
@@ -55,11 +69,15 @@ app.post('/api/auth/signup', async (req, res) => {
             referral_code: ref_code,
             referred_by,
             role: 'user',
-            email: `${username}@mazeloo.com` // placeholder email for schema compatibility
+            email: `${id}@mazeloo-placeholder.com` // use UUID to guarantee email uniqueness
         });
 
         if (insertError) {
-            console.error('Signup DB Error:', insertError);
+            console.error('Signup DB Error:', insertError.message, insertError.details, insertError.hint);
+            // Check for duplicate username (race condition)
+            if (insertError.code === '23505') {
+                return res.status(409).json({ error: 'Username already taken' });
+            }
             return res.status(500).json({ error: `Database Error: ${insertError.message}` });
         }
 
