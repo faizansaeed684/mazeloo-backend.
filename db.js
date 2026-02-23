@@ -1,8 +1,8 @@
 // Direct Supabase REST API client using native fetch
 // This bypasses @supabase/supabase-js and all its dependencies
-
-const SUPABASE_URL = process.env.SUPABASE_URL?.trim() || 'https://iyqgtxxwguumhqqtemzk.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5cWd0eHh3Z3V1bWhxcXRlbXprIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTA2ODg2NSwiZXhwIjoyMDg2NjQ0ODY1fQ.hcZELxCY5Zn6DNKDt0cjRqUcvIkoYeSjPg8M9ADJhos';
+// Hardcoded fallback in case env var has spaces or is missing
+const SUPABASE_URL = 'https://iyqgtxxwguumhqqtemzk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5cWd0eHh3Z3V1bWhxcXRlbXprIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTA2ODg2NSwiZXhwIjoyMDg2NjQ0ODY1fQ.hcZELxCY5Zn6DNKDt0cjRqUcvIkoYeSjPg8M9ADJhos';
 
 console.log('[DB] Supabase URL:', SUPABASE_URL.substring(0, 50));
 console.log('[DB] Key length:', SUPABASE_KEY.length);
