@@ -59,7 +59,7 @@ async function dbSelect(table, { columns = '*', filters = {}, single = false, li
     if (single) headers['Accept'] = 'application/vnd.pgrst.object+json';
 
     try {
-        console.log(`[DB] Attempting fetch for ${table}...`);
+        console.log(`[DB] Attempting fetch for ${table} at ${url}...`);
         const res = await fetch(url, { method: 'GET', headers });
         const text = await res.text();
 
@@ -77,13 +77,13 @@ async function dbSelect(table, { columns = '*', filters = {}, single = false, li
             const res = await httpsRequest(url, { method: 'GET', headers });
             const text = await res.text();
             if (!res.ok) {
-                return { data: null, error: JSON.parse(text) };
+                return { data: null, error: { ...JSON.parse(text), attemptedUrl: url } };
             }
             const data = text ? JSON.parse(text) : (single ? null : []);
             return { data: single ? (data || null) : data, error: null };
         } catch (httpsErr) {
             console.error(`[DB] Native https also failed:`, httpsErr.message);
-            return { data: null, error: { message: e.message, nativeError: httpsErr.message } };
+            return { data: null, error: { message: e.message, nativeError: httpsErr.message, attemptedUrl: url } };
         }
     }
 }

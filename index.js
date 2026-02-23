@@ -37,6 +37,7 @@ app.get('/health', async (req, res) => {
                 supabaseError: error.message,
                 nativeError: error.nativeError || null,
                 cause: error.cause || null,
+                attemptedUrl: error.attemptedUrl || null,
                 url: supabaseUrl.substring(0, 40)
             });
         }
