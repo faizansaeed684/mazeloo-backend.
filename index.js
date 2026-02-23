@@ -27,13 +27,34 @@ console.log('====================');
 // Health check endpoint - also tests Supabase connection
 app.get('/health', async (req, res) => {
     try {
-        const { error } = await supabase.from('users').select('id').limit(1);
+        console.log('[Health] Checking Supabase connection...');
+        const { error, data } = await supabase.from('users').select('id').limit(1);
+
         if (error) {
-            return res.json({ status: 'error', supabaseError: error.message, url: supabaseUrl.substring(0, 40) });
+            console.error('[Health] Connection error details:', error);
+            return res.json({
+                status: 'error',
+                supabaseError: error.message,
+                nativeError: error.nativeError || null,
+                cause: error.cause || null,
+                url: supabaseUrl.substring(0, 40)
+            });
         }
-        res.json({ status: 'ok', supabase: 'connected', url: supabaseUrl.substring(0, 40) });
+
+        res.json({
+            status: 'ok',
+            supabase: 'connected',
+            url: supabaseUrl.substring(0, 40),
+            dataFound: !!data
+        });
     } catch (e) {
-        res.json({ status: 'error', message: e.message, url: supabaseUrl.substring(0, 40) });
+        console.error('[Health] Catch-all error:', e);
+        res.json({
+            status: 'error',
+            message: e.message,
+            stack: e.stack,
+            url: supabaseUrl.substring(0, 40)
+        });
     }
 });
 
