@@ -44,7 +44,7 @@ app.get('/health', async (req, res) => {
 
         res.json({
             status: 'ok',
-            version: '1.0.1-v2', // Added v2 to track my latest push
+            version: '1.0.1-v4',
             supabase: 'connected',
             url: supabaseUrl.substring(0, 40),
             dataFound: !!data
@@ -58,6 +58,11 @@ app.get('/health', async (req, res) => {
             url: supabaseUrl.substring(0, 40)
         });
     }
+});
+
+// Test route to verify routing
+app.get('/api/test', (req, res) => {
+    res.json({ message: 'API connection ok', version: 'v4' });
 });
 
 
