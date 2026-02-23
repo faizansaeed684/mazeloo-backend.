@@ -213,11 +213,46 @@ app.get('/api/profile/:username', authenticateToken, async (req, res) => {
 });
 
 app.patch('/api/profile', authenticateToken, async (req, res) => {
-    const { full_name, bio, country, whatsapp, avatar_url, cover_url, website, location } = req.body;
+    const { full_name, bio, country, whatsapp, avatar_url, cover_url, website, location, email } = req.body;
     try {
+        const updates = {
+            full_name, bio, country, whatsapp, avatar_url, cover_url, website, location,
+            updated_at: new Date().toISOString()
+        };
+
+        // Only update email if provided
+        if (email) updates.email = email;
+
         const { data, error } = await supabase
             .from('users')
-            .update({ full_name, bio, country, whatsapp, avatar_url, cover_url, website, location, updated_at: new Date().toISOString() })
+            .update(updates)
+            .eq('id', req.user.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        const { password_hash, ...profile } = data;
+        res.json(profile);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Profile update failed' });
+    }
+});
+
+// Alias PUT for PATCH to support frontend
+app.put('/api/profile', authenticateToken, async (req, res) => {
+    // Reuse the same logic
+    const { full_name, bio, country, whatsapp, avatar_url, cover_url, website, location, email } = req.body;
+    try {
+        const updates = {
+            full_name, bio, country, whatsapp, avatar_url, cover_url, website, location,
+            updated_at: new Date().toISOString()
+        };
+        if (email) updates.email = email;
+
+        const { data, error } = await supabase
+            .from('users')
+            .update(updates)
             .eq('id', req.user.id)
             .select()
             .single();
@@ -414,17 +449,91 @@ app.post('/api/notifications/read-all', authenticateToken, async (req, res) => {
 // ============ LEADERBOARD ============
 
 app.get('/api/leaderboard', authenticateToken, async (req, res) => {
+    const limit = parseInt(req.query.limit) || 100;
     try {
         const { data, error } = await supabase
             .from('users')
             .select('id, username, full_name, avatar_url, total_points')
             .order('total_points', { ascending: false })
-            .limit(100);
+            .limit(limit);
         if (error) throw error;
         res.json(data);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Leaderboard failed' });
+    }
+});
+
+// ============ VERIFICATION FLOW (NEW) ============
+
+app.post('/api/auth/send-verification', authenticateToken, async (req, res) => {
+    const { type, value } = req.body; // type: 'email' | 'whatsapp'
+    if (!type || !value) return res.status(400).json({ error: 'Missing type or value' });
+
+    try {
+        // Generate a 6-digit code
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires_at = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 mins expiry
+
+        // Upsert code into verification_codes table
+        const { error } = await supabase.from('verification_codes').upsert({
+            user_id: req.user.id,
+            code,
+            type,
+            expires_at
+        }, { onConflict: 'user_id,type' });
+
+        if (error) throw error;
+
+        // In a real app, you would send the email/whatsapp here.
+        // For now, we simulate success and log it.
+        console.log(`[VERIFY] Code for ${req.user.username} (${type}): ${code}`);
+
+        res.json({ success: true, message: `Verification code sent to ${value} (Simulated)` });
+    } catch (err) {
+        console.error('[VERIFY] Send error:', err);
+        res.status(500).json({ error: 'Failed to send verification code' });
+    }
+});
+
+app.post('/api/auth/verify-code', authenticateToken, async (req, res) => {
+    const { type, code } = req.body;
+    if (!type || !code) return res.status(400).json({ error: 'Missing type or code' });
+
+    try {
+        // Check code in DB
+        const { data: record, error } = await supabase
+            .from('verification_codes')
+            .select('*')
+            .eq('user_id', req.user.id)
+            .eq('type', type)
+            .eq('code', code)
+            .maybeSingle();
+
+        if (error) throw error;
+        if (!record) return res.status(400).json({ error: 'Invalid verification code' });
+
+        // Check expiry
+        if (new Date() > new Date(record.expires_at)) {
+            return res.status(400).json({ error: 'Verification code expired' });
+        }
+
+        // Mark user as verified
+        const field = type === 'email' ? 'email_verified' : 'whatsapp_verified';
+        const { error: updateError } = await supabase.from('users').update({
+            [field]: true,
+            has_blue_badge: true // granting blue badge on any verification for now as per app logic
+        }).eq('id', req.user.id);
+
+        if (updateError) throw updateError;
+
+        // Delete the code record
+        await supabase.from('verification_codes').delete().eq('id', record.id);
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[VERIFY] Check error:', err);
+        res.status(500).json({ error: 'Verification failed' });
     }
 });
 
