@@ -14,6 +14,38 @@ const HEADERS = {
     'Prefer': 'return=representation'
 };
 
+import https from 'https';
+
+// Native HTTPS request function as a fallback to fetch
+async function httpsRequest(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const reqOptions = {
+            hostname: urlObj.hostname,
+            path: urlObj.pathname + urlObj.search,
+            method: options.method || 'GET',
+            headers: options.headers || {}
+        };
+
+        const req = https.request(reqOptions, (res) => {
+            let body = '';
+            res.on('data', (chunk) => body += chunk);
+            res.on('end', () => {
+                resolve({
+                    ok: res.statusCode >= 200 && res.statusCode < 300,
+                    statusCode: res.statusCode,
+                    text: async () => body,
+                    json: async () => JSON.parse(body)
+                });
+            });
+        });
+
+        req.on('error', (e) => reject(e));
+        if (options.body) req.write(options.body);
+        req.end();
+    });
+}
+
 // Execute a SELECT query on a table
 async function dbSelect(table, { columns = '*', filters = {}, single = false, limit = null } = {}) {
     let url = `${SUPABASE_URL}/rest/v1/${table}?select=${columns}`;
@@ -26,32 +58,67 @@ async function dbSelect(table, { columns = '*', filters = {}, single = false, li
     const headers = { ...HEADERS };
     if (single) headers['Accept'] = 'application/vnd.pgrst.object+json';
 
-    const res = await fetch(url, { method: 'GET', headers });
-    const text = await res.text();
+    try {
+        console.log(`[DB] Attempting fetch for ${table}...`);
+        const res = await fetch(url, { method: 'GET', headers });
+        const text = await res.text();
 
-    if (!res.ok) {
-        const err = JSON.parse(text);
-        return { data: null, error: err };
+        if (!res.ok) {
+            const err = JSON.parse(text);
+            return { data: null, error: err };
+        }
+
+        const data = text ? JSON.parse(text) : (single ? null : []);
+        return { data: single ? (data || null) : data, error: null };
+    } catch (e) {
+        console.error(`[DB] Fetch failed for ${table}:`, e.message);
+        console.log(`[DB] Falling back to native https module...`);
+        try {
+            const res = await httpsRequest(url, { method: 'GET', headers });
+            const text = await res.text();
+            if (!res.ok) {
+                return { data: null, error: JSON.parse(text) };
+            }
+            const data = text ? JSON.parse(text) : (single ? null : []);
+            return { data: single ? (data || null) : data, error: null };
+        } catch (httpsErr) {
+            console.error(`[DB] Native https also failed:`, httpsErr.message);
+            return { data: null, error: { message: e.message, nativeError: httpsErr.message } };
+        }
     }
-
-    const data = text ? JSON.parse(text) : (single ? null : []);
-    return { data: single ? (data || null) : data, error: null };
 }
 
 // Execute an INSERT query
 async function dbInsert(table, row) {
     const url = `${SUPABASE_URL}/rest/v1/${table}`;
-    const res = await fetch(url, {
+    const options = {
         method: 'POST',
         headers: HEADERS,
         body: JSON.stringify(row)
-    });
-    const text = await res.text();
-    if (!res.ok) {
-        const err = JSON.parse(text);
-        return { data: null, error: err };
+    };
+
+    try {
+        const res = await fetch(url, options);
+        const text = await res.text();
+        if (!res.ok) {
+            const err = JSON.parse(text);
+            return { data: null, error: err };
+        }
+        return { data: text ? JSON.parse(text) : null, error: null };
+    } catch (e) {
+        console.log(`[DB] Insert fetch failed, falling back to native https...`);
+        try {
+            const res = await httpsRequest(url, options);
+            const text = await res.text();
+            if (!res.ok) {
+                return { data: null, error: JSON.parse(text) };
+            }
+            return { data: text ? JSON.parse(text) : null, error: null };
+        } catch (httpsErr) {
+            console.error(`[DB] Insert native https failed:`, httpsErr.message);
+            return { data: null, error: { message: e.message, nativeError: httpsErr.message } };
+        }
     }
-    return { data: text ? JSON.parse(text) : null, error: null };
 }
 
 // Execute an UPDATE query
