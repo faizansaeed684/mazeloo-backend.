@@ -554,9 +554,8 @@ app.patch('/api/settings/password', authenticateToken, async (req, res) => {
     }
 });
 
-// Health check
-app.get('/health', (req, res) => res.json({ status: 'ok', database: 'supabase' }));
 
 app.listen(PORT, () => {
     console.log(`Mazeloo server running on port ${PORT}`);
 });
+
