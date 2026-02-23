@@ -44,6 +44,7 @@ app.get('/health', async (req, res) => {
 
         res.json({
             status: 'ok',
+            version: '1.0.1-v2', // Added v2 to track my latest push
             supabase: 'connected',
             url: supabaseUrl.substring(0, 40),
             dataFound: !!data
